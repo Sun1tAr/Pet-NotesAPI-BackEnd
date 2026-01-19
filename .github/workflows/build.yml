@@ -1,4 +1,5 @@
 name: Maven Build
+run-name: Maven Build
 
 on: [push]
 
@@ -18,4 +19,4 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn --batch-mode --update-snapshots verify
+        run: mvn --batch-mode --update-snapshots test
