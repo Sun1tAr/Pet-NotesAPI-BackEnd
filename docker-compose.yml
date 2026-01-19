@@ -1,0 +1,38 @@
+version: '3.8'
+
+name: notes-api
+
+volumes:
+  pg_notes:
+
+
+services:
+  pg_notes:
+    container_name: pg_notes # имя контейнера, в ином случае будет имя notes-api_pg_notes-1
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=notes_db
+
+    volumes:
+      - pg_notes:/var/lib/postgresql/data
+
+    ports:
+      - "5432:5432"
+
+
+
+  notes_api_app:
+    restart: always
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - pg_notes
+    environment:
+      POSTGRES_URL_NaPi2178e872: 'jdbc:postgresql://pg_notes:5432/notes_db'
+      POSTGRES_USER_NaPi2178e872: 'user'
+      POSTGRES_PASSWORD_NaPi2178e872: 'pass'
+      JAVA_OPTS: '-Xmx512m'
