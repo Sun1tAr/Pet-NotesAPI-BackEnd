@@ -1,38 +1,45 @@
 version: '3.8'
-
 name: notes-api
 
 volumes:
   pg_notes:
 
-
 services:
   pg_notes:
-    container_name: pg_notes # имя контейнера, в ином случае будет имя notes-api_pg_notes-1
     image: postgres:16-alpine
+    container_name: pg_notes
     restart: always
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=notes_db
-
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
+      POSTGRES_DB: notes_db
     volumes:
       - pg_notes:/var/lib/postgresql/data
-
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-
-
-  notes_api_app:
+  app:
+    image: ghcr.io/${GITHUB_REPOSITORY:-твой_username/pet-notesapi-backend}:latest
+    container_name: notes-api-app
     restart: always
-    build: .
     ports:
       - "8080:8080"
     depends_on:
-      - pg_notes
+      pg_notes:
+        condition: service_healthy
     environment:
-      POSTGRES_URL_NaPi2178e872: 'jdbc:postgresql://pg_notes:5432/notes_db'
-      POSTGRES_USER_NaPi2178e872: 'user'
-      POSTGRES_PASSWORD_NaPi2178e872: 'pass'
-      JAVA_OPTS: '-Xmx512m'
+      POSTGRES_URL_NaPi2178e872: jdbc:postgresql://pg_notes:5432/notes_db
+      POSTGRES_USER_NaPi2178e872: user
+      POSTGRES_PASSWORD_NaPi2178e872: ${POSTGRES_PASSWORD:-pass}
+      JAVA_OPTS: -Xmx512m
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/swagger-ui.html"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
