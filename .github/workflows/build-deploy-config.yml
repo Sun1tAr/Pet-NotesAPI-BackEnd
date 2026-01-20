@@ -138,7 +138,7 @@ jobs:
             set -e
             echo "=== Configuring Nginx ==="
             cd /opt/pet-notes-api
-            envsubst < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
+            envsubst '${SERVER_NAME} ${REPO_NAME}' < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
             if ! nginx -t -c /tmp/pet-notes-api.conf; then
               echo "❌ Nginx config syntax error!"
               cat /tmp/pet-notes-api.conf
