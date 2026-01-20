@@ -75,19 +75,12 @@ jobs:
           envs: POSTGRES_PASSWORD,GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME
           script: |
             set -e
-            
             echo "=== Starting Docker deployment ==="
             cd /opt/pet-notes-api
-            
-            # Логин в GHCR с токеном
             echo "=== Logging in to GHCR ==="
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
-            
-            # Подтянуть свежий образ
             echo "=== Pulling latest image ==="
             docker pull ghcr.io/${IMAGE_NAME}:latest
-            
-            # ПОЛНАЯ очистка
             echo "=== Cleaning up old containers ==="
             docker-compose down -v --remove-orphans || true
             docker container rm -f notes-api-app pg_notes 2>/dev/null || true
@@ -95,20 +88,12 @@ jobs:
             docker container prune -f
             docker network prune -f
             fuser -k 8888/tcp 2>/dev/null || true
-            
             sleep 2
-            
-            # Запустить новые
             echo "=== Starting new containers ==="
-            POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
-            docker-compose up -d
-            
-            # Ждём
+            POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" docker-compose up -d
             echo "=== Waiting for app to be healthy ==="
             sleep 15
             docker-compose logs app
-            
-            # Проверка
             if docker-compose ps | grep -q "Up"; then
               echo "✅ Docker deployment successful!"
             else
@@ -116,8 +101,6 @@ jobs:
               docker-compose logs
               exit 1
             fi
-            
-            # Очистка Docker
             echo "=== Cleaning up Docker ==="
             docker logout ghcr.io
             docker image prune -f
@@ -125,12 +108,12 @@ jobs:
   configure-nginx:
     needs: deploy
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy Nginx config template
+      - name: Copy Nginx config
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -153,27 +136,18 @@ jobs:
           envs: SERVER_NAME,REPO_NAME
           script: |
             set -e
-            
             echo "=== Configuring Nginx ==="
             cd /opt/pet-notes-api
-            
-            # Подстановка переменных в конфиг
-            envsubst < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf nginx -t -c /tmp/pet-notes-api.conf
-            
-            # Проверка синтаксиса
-            sudo nginx -t -c /tmp/pet-notes-api.conf 2>/dev/null || {
+            envsubst < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
+            if ! nginx -t -c /tmp/pet-notes-api.conf; then
               echo "❌ Nginx config syntax error!"
+              cat /tmp/pet-notes-api.conf
               exit 1
-            }
-            
-            # Применить конфиг
+            fi
             sudo cp /tmp/pet-notes-api.conf /etc/nginx/sites-available/pet-notes-api.conf
             sudo ln -sf /etc/nginx/sites-available/pet-notes-api.conf /etc/nginx/sites-enabled/
-            
-            # Перезагрузить Nginx
+            sudo rm -f /etc/nginx/sites-enabled/default
             sudo systemctl reload nginx
-            
-            # Проверка
             if sudo systemctl is-active --quiet nginx; then
               echo "✅ Nginx configured successfully!"
               echo "API available at: http://${SERVER_NAME}/${REPO_NAME}"
