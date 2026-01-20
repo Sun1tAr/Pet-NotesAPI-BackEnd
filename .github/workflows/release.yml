@@ -1,0 +1,23 @@
+name: Create Release
+on:
+  push:
+    tags: ['v*']  # v1.0.0 → trigger
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build JAR
+        run: mvn clean package -DskipTests
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/*.jar
+            docker-compose.yml
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
