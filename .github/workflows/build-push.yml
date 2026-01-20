@@ -87,9 +87,18 @@ jobs:
             echo "=== Pulling latest image ==="
             docker pull ghcr.io/${IMAGE_NAME}:latest
             
-            # Остановить старые контейнеры
-            echo "=== Stopping old containers ==="
-            docker-compose down || true
+            # ПОЛНАЯ очистка
+            echo "=== Cleaning up old containers ==="
+            docker-compose down -v --remove-orphans || true
+            docker container rm -f notes-api-app pg_notes || true
+            docker network rm pet-notes-api_default || true
+            
+            # Дополнительная очистка
+            docker container prune -f
+            docker network prune -f
+            
+            # Малая пауза
+            sleep 2
             
             # Запустить новые
             echo "=== Starting new containers ==="
