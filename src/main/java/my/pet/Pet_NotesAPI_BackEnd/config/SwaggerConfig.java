@@ -14,15 +14,17 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
-//  //               todo uncomment it
-//                .servers(
-//                        List.of(
-//                                new Server().url("http://localhost:8080")
-//                        )
-//                )
+                .servers(
+                        List.of(
+                                new Server()
+                                        .url("https://denchik2376.fvds.ru/Pet-NotesAPI-BackEnd")
+                                        .description("Production")
+                        )
+                )
                 .info(
                         new Info()
                                 .title("Notes API")
+                                .version("1.0.0")
                 );
     }
 

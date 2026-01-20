@@ -1,7 +1,3 @@
-# Root redirect
-location = /${REPO_NAME} {
-    return 301 /${REPO_NAME}/swagger-ui/index.html;
-}
 
 # Trailing slash fix
 location /${REPO_NAME} {
