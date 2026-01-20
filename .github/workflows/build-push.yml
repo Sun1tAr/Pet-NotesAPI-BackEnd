@@ -72,9 +72,7 @@ jobs:
             if [ -d "/opt/pet-notes-api/Pet-NotesAPI-BackEnd" ]; then
               echo "=== Reorganizing directory structure ==="
               cd /opt/pet-notes-api
-              # Переместить всё (включая скрытые файлы) наружу
               find Pet-NotesAPI-BackEnd -mindepth 1 -maxdepth 1 -exec mv {} . \;
-              # Удалить пустую папку
               rm -rf Pet-NotesAPI-BackEnd
               echo "✅ Directory reorganized"
             fi
@@ -98,24 +96,24 @@ jobs:
             
             # Остановить старые контейнеры (БД volumes остаются!)
             echo "=== Stopping old containers ==="
-            docker compose down || true
+            docker-compose down || true
             
             # Запустить новые с переменными окружения
             echo "=== Starting new containers ==="
             POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
-            docker compose up -d
+            docker-compose up -d
             
             # Ждём, пока приложение поднимется
             echo "=== Waiting for app to be healthy ==="
             sleep 15
-            docker compose logs app
+            docker-compose logs app
             
             # Проверка здоровья
-            if docker compose ps | grep -q "healthy\|Up"; then
+            if docker-compose ps | grep -q "healthy\|Up"; then
               echo "✅ Deployment successful!"
             else
               echo "❌ Deployment failed!"
-              docker compose logs
+              docker-compose logs
               exit 1
             fi
             
