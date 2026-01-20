@@ -15,12 +15,12 @@ import org.springframework.web.servlet.view.RedirectView;
 @RequestMapping({"/", ""})
 public class MainController implements InformationController{
 
-    @GetMapping
-    public RedirectView redirectToRoot() {
-        RedirectView redirectView = new RedirectView();
-        redirectView.setUrl("/swagger-ui.html");
-        return redirectView;
-    }
+   // @GetMapping
+   // public RedirectView redirectToRoot() {
+      //  RedirectView redirectView = new RedirectView();
+       // redirectView.setUrl("/swagger-ui.html");
+   //     return redirectView;
+  //  }
 
 
 }
