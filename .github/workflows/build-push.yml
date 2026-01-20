@@ -56,7 +56,7 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
-          IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
+          IMAGE_NAME: sun1tar/pet-notesapi-backend
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -68,15 +68,15 @@ jobs:
             
             echo "=== Starting deployment ==="
             
-            # Если директория пуста или содержит только папку репозитория - переместить
+            # Если директория содержит папку репозитория - переместить всё наружу
             if [ -d "/opt/pet-notes-api/Pet-NotesAPI-BackEnd" ]; then
               echo "=== Reorganizing directory structure ==="
               cd /opt/pet-notes-api
-              if [ $(ls -1 | wc -l) -eq 1 ]; then
-                # Если только одна папка - переместить всё наружу
-                mv Pet-NotesAPI-BackEnd/* .
-                rmdir Pet-NotesAPI-BackEnd
-              fi
+              # Переместить всё (включая скрытые файлы) наружу
+              find Pet-NotesAPI-BackEnd -mindepth 1 -maxdepth 1 -exec mv {} . \;
+              # Удалить пустую папку
+              rm -rf Pet-NotesAPI-BackEnd
+              echo "✅ Directory reorganized"
             fi
             
             cd /opt/pet-notes-api
@@ -84,6 +84,7 @@ jobs:
             # Убедиться, что docker-compose.yml существует
             if [ ! -f "docker-compose.yml" ]; then
               echo "❌ docker-compose.yml not found!"
+              ls -la
               exit 1
             fi
             
@@ -91,7 +92,7 @@ jobs:
             echo "=== Logging in to GHCR ==="
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             
-            # Подтянуть свежий образ (используем lowercase)
+            # Подтянуть свежий образ
             echo "=== Pulling latest image ==="
             docker pull ghcr.io/${IMAGE_NAME}:latest
             
