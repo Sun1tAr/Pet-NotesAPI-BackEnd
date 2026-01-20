@@ -1,5 +1,4 @@
 version: '3.8'
-name: notes-api
 
 volumes:
   pg_notes:
@@ -11,7 +10,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: notes_db
     volumes:
       - pg_notes:/var/lib/postgresql/data
@@ -35,7 +34,7 @@ services:
     environment:
       POSTGRES_URL_NaPi2178e872: jdbc:postgresql://pg_notes:5432/notes_db
       POSTGRES_USER_NaPi2178e872: user
-      POSTGRES_PASSWORD_NaPi2178e872: ${POSTGRES_PASSWORD:-pass}
+      POSTGRES_PASSWORD_NaPi2178e872: ${POSTGRES_PASSWORD}
       JAVA_OPTS: -Xmx512m
       SPRING_PROFILES_ACTIVE: docker
     healthcheck:
