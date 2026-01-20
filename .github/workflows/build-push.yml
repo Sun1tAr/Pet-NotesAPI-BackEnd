@@ -56,7 +56,7 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
-          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -64,10 +64,31 @@ jobs:
           port: 22
           envs: POSTGRES_PASSWORD,GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME
           script: |
+            set -e
+            
             echo "=== Starting deployment ==="
+            
+            # Если директория пуста или содержит только папку репозитория - переместить
+            if [ -d "/opt/pet-notes-api/Pet-NotesAPI-BackEnd" ]; then
+              echo "=== Reorganizing directory structure ==="
+              cd /opt/pet-notes-api
+              if [ $(ls -1 | wc -l) -eq 1 ]; then
+                # Если только одна папка - переместить всё наружу
+                mv Pet-NotesAPI-BackEnd/* .
+                rmdir Pet-NotesAPI-BackEnd
+              fi
+            fi
+            
             cd /opt/pet-notes-api
             
+            # Убедиться, что docker-compose.yml существует
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "❌ docker-compose.yml not found!"
+              exit 1
+            fi
+            
             # Логин в GHCR с токеном
+            echo "=== Logging in to GHCR ==="
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             
             # Подтянуть свежий образ (используем lowercase)
@@ -76,7 +97,7 @@ jobs:
             
             # Остановить старые контейнеры (БД volumes остаются!)
             echo "=== Stopping old containers ==="
-            docker compose down
+            docker compose down || true
             
             # Запустить новые с переменными окружения
             echo "=== Starting new containers ==="
@@ -85,7 +106,7 @@ jobs:
             
             # Ждём, пока приложение поднимется
             echo "=== Waiting for app to be healthy ==="
-            sleep 10
+            sleep 15
             docker compose logs app
             
             # Проверка здоровья
@@ -93,6 +114,7 @@ jobs:
               echo "✅ Deployment successful!"
             else
               echo "❌ Deployment failed!"
+              docker compose logs
               exit 1
             fi
             
