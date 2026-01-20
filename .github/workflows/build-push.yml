@@ -47,19 +47,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.0
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
-          envs: POSTGRES_PASSWORD,GITHUB_TOKEN,GITHUB_ACTOR,GITHUB_REPOSITORY
+          envs: POSTGRES_PASSWORD,GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME
           script: |
             echo "=== Starting deployment ==="
             cd /opt/pet-notes-api
@@ -67,23 +70,23 @@ jobs:
             # Логин в GHCR с токеном
             echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
             
-            # Подтянуть свежий образ
+            # Подтянуть свежий образ (используем lowercase)
             echo "=== Pulling latest image ==="
-            docker pull ghcr.io/${GITHUB_REPOSITORY}:latest
+            docker pull ghcr.io/${IMAGE_NAME}:latest
             
             # Остановить старые контейнеры (БД volumes остаются!)
             echo "=== Stopping old containers ==="
-            docker-compose down
+            docker compose down
             
             # Запустить новые с переменными окружения
             echo "=== Starting new containers ==="
             POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
-            docker-compose up -d
+            docker compose up -d
             
             # Ждём, пока приложение поднимется
             echo "=== Waiting for app to be healthy ==="
             sleep 10
-            docker-compose logs app
+            docker compose logs app
             
             # Проверка здоровья
             if docker compose ps | grep -q "healthy\|Up"; then
