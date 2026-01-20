@@ -158,7 +158,7 @@ jobs:
             cd /opt/pet-notes-api
             
             # Подстановка переменных в конфиг
-            envsubst < /opt/pet-notes-api/nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
+            envsubst < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf nginx -t -c /tmp/pet-notes-api.conf
             
             # Проверка синтаксиса
             sudo nginx -t -c /tmp/pet-notes-api.conf 2>/dev/null || {
