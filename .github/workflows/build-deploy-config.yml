@@ -45,22 +45,22 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy docker-compose.yml to VPS
+      - name: Copy files to VPS
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
-          source: "docker-compose.yml"
+          source: "docker-compose.yml,nginx/pet-notes-api.conf.template"
           target: "/opt/pet-notes-api/"
 
-      - name: Deploy to VPS
+      - name: Deploy Docker containers
         uses: appleboy/ssh-action@v1.0.0
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -76,7 +76,7 @@ jobs:
           script: |
             set -e
             
-            echo "=== Starting deployment ==="
+            echo "=== Starting Docker deployment ==="
             cd /opt/pet-notes-api
             
             # Логин в GHCR с токеном
@@ -90,14 +90,12 @@ jobs:
             # ПОЛНАЯ очистка
             echo "=== Cleaning up old containers ==="
             docker-compose down -v --remove-orphans || true
-            docker container rm -f notes-api-app pg_notes || true
-            docker network rm pet-notes-api_default || true
-            
-            # Дополнительная очистка
+            docker container rm -f notes-api-app pg_notes 2>/dev/null || true
+            docker network rm pet-notes-api_default 2>/dev/null || true
             docker container prune -f
             docker network prune -f
+            fuser -k 8888/tcp 2>/dev/null || true
             
-            # Малая пауза
             sleep 2
             
             # Запустить новые
@@ -111,15 +109,75 @@ jobs:
             docker-compose logs app
             
             # Проверка
-            if docker-compose ps | grep -q "healthy\|Up"; then
-              echo "✅ Deployment successful!"
+            if docker-compose ps | grep -q "Up"; then
+              echo "✅ Docker deployment successful!"
             else
-              echo "❌ Deployment failed!"
+              echo "❌ Docker deployment failed!"
               docker-compose logs
               exit 1
             fi
             
-            # Очистка
-            echo "=== Cleaning up ==="
+            # Очистка Docker
+            echo "=== Cleaning up Docker ==="
             docker logout ghcr.io
             docker image prune -f
+
+  configure-nginx:
+    needs: deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy Nginx config template
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          source: "nginx/pet-notes-api.conf.template"
+          target: "/opt/pet-notes-api/"
+
+      - name: Configure Nginx
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          SERVER_NAME: ${{ secrets.SERVER_NAME }}
+          REPO_NAME: ${{ secrets.REPO_NAME }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          envs: SERVER_NAME,REPO_NAME
+          script: |
+            set -e
+            
+            echo "=== Configuring Nginx ==="
+            cd /opt/pet-notes-api
+            
+            # Подстановка переменных в конфиг
+            envsubst < /opt/pet-notes-api/nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
+            
+            # Проверка синтаксиса
+            sudo nginx -t -c /tmp/pet-notes-api.conf 2>/dev/null || {
+              echo "❌ Nginx config syntax error!"
+              exit 1
+            }
+            
+            # Применить конфиг
+            sudo cp /tmp/pet-notes-api.conf /etc/nginx/sites-available/pet-notes-api.conf
+            sudo ln -sf /etc/nginx/sites-available/pet-notes-api.conf /etc/nginx/sites-enabled/
+            
+            # Перезагрузить Nginx
+            sudo systemctl reload nginx
+            
+            # Проверка
+            if sudo systemctl is-active --quiet nginx; then
+              echo "✅ Nginx configured successfully!"
+              echo "API available at: http://${SERVER_NAME}/${REPO_NAME}"
+            else
+              echo "❌ Nginx configuration failed!"
+              exit 1
+            fi
