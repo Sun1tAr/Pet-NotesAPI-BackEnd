@@ -50,7 +50,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy files to VPS and deploy
+      - name: Copy docker-compose.yml to VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          source: "docker-compose.yml"
+          target: "/opt/pet-notes-api/"
+
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.0
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -63,16 +73,10 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
           envs: POSTGRES_PASSWORD,GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME
-          script_stop: true
           script: |
             set -e
             
             echo "=== Starting deployment ==="
-            
-            # Чистим и готовим директорию
-            rm -rf /opt/pet-notes-api/*
-            mkdir -p /opt/pet-notes-api
-            
             cd /opt/pet-notes-api
             
             # Логин в GHCR с токеном
@@ -110,13 +114,3 @@ jobs:
             echo "=== Cleaning up ==="
             docker logout ghcr.io
             docker image prune -f
-
-      - name: Copy docker-compose.yml via SCP
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          port: 22
-          source: "docker-compose.yml"
-          target: "/opt/pet-notes-api/"
