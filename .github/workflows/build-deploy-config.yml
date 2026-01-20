@@ -108,10 +108,8 @@ jobs:
   configure-nginx:
     needs: deploy
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Copy Nginx config
         uses: appleboy/scp-action@master
@@ -123,7 +121,7 @@ jobs:
           source: "nginx/pet-notes-api.conf.template"
           target: "/opt/pet-notes-api/"
 
-      - name: Configure Nginx
+      - name: Configure Nginx proxy
         uses: appleboy/ssh-action@v1.0.0
         env:
           SERVER_NAME: ${{ secrets.SERVER_NAME }}
@@ -134,33 +132,17 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
           envs: SERVER_NAME,REPO_NAME
-          script: |
-            set -e
-            echo "=== Configuring Nginx ==="
-            cd /opt/pet-notes-api
-            
-            # Подстановка переменных
-            envsubst '${SERVER_NAME} ${REPO_NAME}' < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
-            
-            # Копируем СНАЧАЛА
-            sudo cp /tmp/pet-notes-api.conf /etc/nginx/sites-available/pet-notes-api.conf
-            sudo ln -sf /etc/nginx/sites-available/pet-notes-api.conf /etc/nginx/sites-enabled/
-            sudo rm -f /etc/nginx/sites-enabled/default
-            
-            # ПОТОМ проверяем весь конфиг (не отдельный файл)
-            if ! sudo nginx -t; then
-            echo "❌ Nginx config syntax error!"
-            exit 1
-            fi
-            
-            # Перезагружаем
-            sudo systemctl reload nginx
-            
-            if sudo systemctl is-active --quiet nginx; then
-              echo "✅ Nginx configured successfully!"
-              echo "API available at: http://${SERVER_NAME}/${REPO_NAME}"
-            else
-              echo "❌ Nginx configuration failed!"
-              exit 1
-            fi
+        script: |
+          set -e
+          cd /opt/pet-notes-api
+
+          
+          envsubst '${SERVER_NAME} ${REPO_NAME}' < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
+
+          sudo cp /tmp/pet-notes-api.conf /etc/nginx/apps-available/pet-notes-api.conf
+          sudo ln -sf /etc/nginx/apps-available/pet-notes-api.conf /etc/nginx/apps-enabled/
+
+          sudo nginx -t && sudo systemctl reload nginx
+
+          echo "✅ http://${SERVER_NAME}/${REPO_NAME}/swagger-ui.html"
 
