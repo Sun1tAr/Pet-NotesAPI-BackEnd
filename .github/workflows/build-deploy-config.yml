@@ -138,16 +138,24 @@ jobs:
             set -e
             echo "=== Configuring Nginx ==="
             cd /opt/pet-notes-api
+            
+            # Подстановка переменных
             envsubst '${SERVER_NAME} ${REPO_NAME}' < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
-            if ! nginx -t -c /tmp/pet-notes-api.conf; then
-              echo "❌ Nginx config syntax error!"
-              cat /tmp/pet-notes-api.conf
-              exit 1
-            fi
+            
+            # Копируем СНАЧАЛА
             sudo cp /tmp/pet-notes-api.conf /etc/nginx/sites-available/pet-notes-api.conf
             sudo ln -sf /etc/nginx/sites-available/pet-notes-api.conf /etc/nginx/sites-enabled/
             sudo rm -f /etc/nginx/sites-enabled/default
+            
+            # ПОТОМ проверяем весь конфиг (не отдельный файл)
+            if ! sudo nginx -t; then
+            echo "❌ Nginx config syntax error!"
+            exit 1
+            fi
+            
+            # Перезагружаем
             sudo systemctl reload nginx
+            
             if sudo systemctl is-active --quiet nginx; then
               echo "✅ Nginx configured successfully!"
               echo "API available at: http://${SERVER_NAME}/${REPO_NAME}"
@@ -155,3 +163,4 @@ jobs:
               echo "❌ Nginx configuration failed!"
               exit 1
             fi
+
