@@ -143,8 +143,8 @@ jobs:
             envsubst '${SERVER_NAME} ${REPO_NAME}' < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
             
             # Копируем СНАЧАЛА
-            sudo cp /tmp/pet-notes-api.conf /etc/nginx/sites-available/pet-notes-api.conf
-            sudo ln -sf /etc/nginx/sites-available/pet-notes-api.conf /etc/nginx/sites-enabled/
+            sudo cp /tmp/pet-notes-api.conf /etc/nginx/apps-available/pet-notes-api.conf
+            sudo ln -sf /etc/nginx/apps-available/pet-notes-api.conf /etc/nginx/apps-enabled/
             
             # Если нужно удалить дефолтный конфиг nginx
             # sudo rm -f /etc/nginx/sites-enabled/default
