@@ -27,7 +27,7 @@ services:
     container_name: notes-api-app
     restart: always
     ports:
-      - "8080:8080"
+      - "8888:8080"  # ← Контейнер на 8080, наружу 8888
     depends_on:
       pg_notes:
         condition: service_healthy
