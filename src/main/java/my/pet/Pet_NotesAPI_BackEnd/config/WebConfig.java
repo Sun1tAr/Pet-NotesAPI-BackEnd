@@ -9,7 +9,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@EnableWebMvc
+//@EnableWebMvc
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 
@@ -25,7 +25,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")           // для всех эндпоинтов
-                .allowedOrigins("*")           // доступ есть с любых хостов
+                .allowedOrigins("http://denchik2376.fvds.ru*")           // доступ есть с любых хостов
                 .allowedMethods("*")           // для всех методов HTTP
                 .allowedHeaders("*")           // в запросе можно ставить любые заголовки
                 .maxAge(3600);                 // браузер может час не отправлять Options
