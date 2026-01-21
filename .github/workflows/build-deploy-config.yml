@@ -83,7 +83,7 @@ jobs:
             echo "=== Pulling latest image ==="
             docker pull ghcr.io/${IMAGE_NAME}:latest
             echo "=== Cleaning up old containers ==="
-            docker-compose down --remove-orphans || true
+            docker-compose -f .docker/docker-compose.yml  down --remove-orphans || true
             docker container rm -f notes-api-app pg_notes 2>/dev/null || true
             docker network rm pet-notes-api_default 2>/dev/null || true
             docker container prune -f
@@ -91,15 +91,15 @@ jobs:
             fuser -k 8888/tcp 2>/dev/null || true
             sleep 2
             echo "=== Starting new containers ==="
-            POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" .docker/docker-compose up -d
+            POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" docker-compose -f .docker/docker-compose.yml up -d
             echo "=== Waiting for app to be healthy ==="
             sleep 15
-            docker-compose logs app
-            if docker-compose ps | grep -q "Up"; then
+            docker-compose -f .docker/docker-compose.yml  logs app
+            if docker-compose -f .docker/docker-compose.yml  ps | grep -q "Up"; then
               echo "✅ Docker deployment successful!"
             else
               echo "❌ Docker deployment failed!"
-              docker-compose logs
+              docker-compose -f .docker/docker-compose.yml  logs
               exit 1
             fi
             echo "=== Cleaning up Docker ==="
