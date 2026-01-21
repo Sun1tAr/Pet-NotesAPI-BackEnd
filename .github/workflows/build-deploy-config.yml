@@ -82,7 +82,7 @@ jobs:
             echo "=== Pulling latest image ==="
             docker pull ghcr.io/${IMAGE_NAME}:latest
             echo "=== Cleaning up old containers ==="
-            docker-compose down -v --remove-orphans || true
+            docker-compose down --remove-orphans || true
             docker container rm -f notes-api-app pg_notes 2>/dev/null || true
             docker network rm pet-notes-api_default 2>/dev/null || true
             docker container prune -f
