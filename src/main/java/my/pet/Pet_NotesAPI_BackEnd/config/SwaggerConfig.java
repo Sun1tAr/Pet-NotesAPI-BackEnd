@@ -17,7 +17,7 @@ public class SwaggerConfig {
                 .servers(
                         List.of(
                                 new Server()
-                                        .url("https://denchik2376.fvds.ru/Pet-NotesAPI-BackEnd")
+                                        .url("http://denchik2376.fvds.ru/Pet-NotesAPI-BackEnd")
                                         .description("Production")
                         )
                 )
