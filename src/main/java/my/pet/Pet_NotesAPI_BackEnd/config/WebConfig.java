@@ -25,9 +25,10 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")           // для всех эндпоинтов
-                .allowedOrigins("http://denchik2376.fvds.ru*")           // доступ есть с любых хостов
+                .allowedOrigins("https://denchik2376.fvds.ru*", "http://denchik2376.fvds.ru*")           // доступ есть с любых хостов
                 .allowedMethods("*")           // для всех методов HTTP
                 .allowedHeaders("*")           // в запросе можно ставить любые заголовки
+                .allowCredentials(false)
                 .maxAge(3600);                 // браузер может час не отправлять Options
     }
 
