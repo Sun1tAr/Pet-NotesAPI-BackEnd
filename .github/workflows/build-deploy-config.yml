@@ -57,7 +57,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
-          source: "docker-compose.yml,nginx/pet-notes-api.conf.template"
+          source: ".docker/docker-compose.yml,.nginx/pet-notes-api.conf.template"
           target: "/opt/pet-notes-api/"
 
       - name: Deploy Docker containers
@@ -90,7 +90,7 @@ jobs:
             fuser -k 8888/tcp 2>/dev/null || true
             sleep 2
             echo "=== Starting new containers ==="
-            POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" docker-compose up -d
+            POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" .docker/docker-compose up -d
             echo "=== Waiting for app to be healthy ==="
             sleep 15
             docker-compose logs app
@@ -120,7 +120,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: 22
-          source: "nginx/pet-notes-api.conf.template"
+          source: ".nginx/pet-notes-api.conf.template"
           target: "/opt/pet-notes-api/"
 
       - name: Configure Nginx
@@ -140,7 +140,7 @@ jobs:
             cd /opt/pet-notes-api
             
             # Подстановка переменных
-            envsubst '${SERVER_NAME} ${REPO_NAME}' < nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
+            envsubst '${SERVER_NAME} ${REPO_NAME}' < .nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
             
             # Копируем СНАЧАЛА
             sudo cp /tmp/pet-notes-api.conf /etc/nginx/apps-available/pet-notes-api.conf

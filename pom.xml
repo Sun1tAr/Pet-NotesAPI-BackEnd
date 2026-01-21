@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>my.pet</groupId>
 	<artifactId>Pet-NotesAPI-BackEnd</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>Pet-NotesAPI-BackEnd</name>
 	<description>Demo project for Spring Boot</description>
 	<url/>
