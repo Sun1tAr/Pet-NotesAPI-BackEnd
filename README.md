@@ -1,4 +1,3 @@
 # Notes API
 
-[//]: # (todo)
-[//]: # (   qwsdfbn)
+## Create new README + Realeses
