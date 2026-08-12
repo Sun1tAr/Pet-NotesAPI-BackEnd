@@ -45,13 +45,11 @@ jobs:
       - name: Create test file on home server
         run: |
           ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'EOF'
-            cat > /tmp/deploy.sh << 'ENDSSH'
-              pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} -i ~/.ssh/id_rsa << 'INNER'
-                mkdir -p ${{ env.TEST_DIR }}
-                echo "Test file created at $(date) from GitHub Actions via VPS relay" > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }}
-                ls -la ${{ env.TEST_DIR }}
-                INNER
+            pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} -i ~/.ssh/id_rsa << 'ENDSSH'
+              mkdir -p ${{ env.TEST_DIR }}
+              cat > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} << 'FILE'
+              Test file created at $(date) from GitHub Actions via VPS relay
+              FILE
+              ls -la ${{ env.TEST_DIR }}/
               ENDSSH
-            chmod +x /tmp/deploy.sh
-            /tmp/deploy.sh
             EOF
