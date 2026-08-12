@@ -52,7 +52,7 @@ jobs:
             --attach || true
 
           sleep 5
-          sudo pangolin statu
+          sudo pangolin status
           
           # Запускаем пинг для поддержания туннеля
           sudo ping -i 0.5 100.96.128.1 > /dev/null 2>&1 &
