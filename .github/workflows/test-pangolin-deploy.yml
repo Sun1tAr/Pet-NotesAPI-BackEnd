@@ -41,23 +41,26 @@ jobs:
           PANGOLIN_MACHINE_ID: ${{ secrets.PANGOLIN_MACHINE_ID }}
           PANGOLIN_MACHINE_SECRET: ${{ secrets.PANGOLIN_MACHINE_SECRET }}
           PANGOLIN_ENDPOINT: ${{ env.PANGOLIN_ENDPOINT }}
+          PANGOLIN_ORG: ${{ env.ORG_NAME }}
         run: |
-          # 1. Поднимаем системный WireGuard туннель Pangolin в фоне
+          # 1. Запускаем туннель в фоне под sudo, как и раньше
           sudo pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
             --endpoint "$PANGOLIN_ENDPOINT" \
             --attach &
 
-          # 2. Даем 12 секунд (с запасом), чтобы WireGuard гарантированно перешел в статус CONNECTED
-          sleep 12
+          # 2. Ждем стабильного запуска службы
+          sleep 7
 
-          # 3. Ходим на домашний сервер напрямую через стандартный SSH Linux, используя IP-адрес/псевдоним туннеля
-          # Флаги -o отключают интерактивные запросы TTY для незнакомых хостов
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
-            "mkdir -p ${{ env.TEST_DIR }} && \
-             echo 'Test file created at \$(date) from GitHub Actions via Direct System SSH' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
-             ls -la ${{ env.TEST_DIR }}/"
+          # 3. Выполняем стандартный SSH, но проксируем трафик через механизм Pangolin.
+          # Флаг -o ProxyCommand заставляет Pangolin будить целевой хост принудительно.
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o ProxyCommand="sudo pangolin proxy ssh --org '$PANGOLIN_ORG' --host %h --port %p" \
+              ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
+              "mkdir -p ${{ env.TEST_DIR }} && \
+               echo 'Test file created via Pangolin ProxyCommand' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+               ls -la ${{ env.TEST_DIR }}/"
 
 
