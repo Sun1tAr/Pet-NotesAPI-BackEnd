@@ -56,7 +56,9 @@ jobs:
         run: |
           # Ждем, пока установится соединение
           sleep 5
-          pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
+          pangolin ssh \
+            --org "$ORG_NAME" \
+            ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
             "mkdir -p ${{ env.TEST_DIR }} && \
              echo 'Test file created at $(date) from GitHub Actions via Pangolin Machine Client' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
              ls -la ${{ env.TEST_DIR }}/"
