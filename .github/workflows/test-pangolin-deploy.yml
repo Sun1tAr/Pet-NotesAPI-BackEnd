@@ -41,26 +41,34 @@ jobs:
           PANGOLIN_MACHINE_ID: ${{ secrets.PANGOLIN_MACHINE_ID }}
           PANGOLIN_MACHINE_SECRET: ${{ secrets.PANGOLIN_MACHINE_SECRET }}
           PANGOLIN_ENDPOINT: ${{ env.PANGOLIN_ENDPOINT }}
-          PANGOLIN_ORG: ${{ env.ORG_NAME }}
         run: |
-          # 1. Запускаем туннель в фоне под sudo, как и раньше
+          # 1. Поднимаем системный WireGuard туннель Pangolin в фоне
           sudo pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
             --endpoint "$PANGOLIN_ENDPOINT" \
             --attach &
 
-          # 2. Ждем стабильного запуска службы
-          sleep 7
+          # 2. Даем 5 секунд до момента успешного CONNECTED
+          sleep 5
 
-          # 3. Выполняем стандартный SSH, но проксируем трафик через механизм Pangolin.
-          # Флаг -o ProxyCommand заставляет Pangolin будить целевой хост принудительно.
+          # 3. КРИТИЧЕСКИЙ ШАГ: Запускаем фоновый пинг DNS-сервера Pangolin (100.96.128.1).
+          # Это генерирует постоянный микро-трафик и НЕ ДАСТ туннелю уйти в DISCONNECTED!
+          ping -i 1 100.96.128.1 > /dev/null &
+          
+          # Ждем еще 3 секунды, чтобы зафиксировать трафик
+          sleep 3
+
+          # 4. Проверяем статус (теперь он гарантированно будет Connected)
+          sudo pangolin status || true
+
+          # 5. Используем стандартный нативный SSH, который теперь легко пройдет через "разогретый" туннель
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o ProxyCommand="sudo pangolin proxy ssh --org '$PANGOLIN_ORG' --host %h --port %p" \
               ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
               "mkdir -p ${{ env.TEST_DIR }} && \
-               echo 'Test file created via Pangolin ProxyCommand' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+               echo 'Test file created via Warmed Up Pangolin Tunnel' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
                ls -la ${{ env.TEST_DIR }}/"
+
 
 
