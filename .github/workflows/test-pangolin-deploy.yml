@@ -27,7 +27,6 @@ jobs:
         run: |
           curl -fsSL https://static.pangolin.net/get-cli.sh | bash
           sudo mv pangolin /usr/local/bin/ || true
-          pangolin --version
 
       - name: Setup SSH key for home server
         run: |
