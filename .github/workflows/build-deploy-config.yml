@@ -45,7 +45,7 @@ jobs:
       - name: Start Pangolin tunnel (with timeout)
         run: |
           # Запускаем с таймаутом 30 секунд
-          timeout 30 sudo pangolin up \
+          sudo pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
             --endpoint "$PANGOLIN_ENDPOINT" \
@@ -57,20 +57,18 @@ jobs:
           # Запускаем пинг для поддержания туннеля
           sudo ping -i 0.5 100.96.128.1 > /dev/null 2>&1 &
 
-      # ОТДЕЛЬНЫЙ ШАГ ДЛЯ SSH
-      - name: Execute commands on home server
-        run: |
-          # Настраиваем DNS
-          echo "nameserver 100.96.128.1" | sudo tee /etc/resolv.conf
+          # Настраиваем DNS через systemd-resolved
+          sudo resolvectl dns pangolin 100.96.128.1
+          sudo resolvectl domain pangolin '~internal'
           
-          # Проверяем, что host.internal резолвится
-          nslookup host.internal || true
+          # Проверяем, что хост резолвится
+          getent ahosts host.internal || echo "Resolve check failed"
           
-          # Подключаемся и создаем файл
+          # Подключаемся
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               -o ConnectTimeout=10 \
               ${{ env.SSH_USER }}@host.internal \
               "mkdir -p ${{ env.TEST_DIR }} && \
-               echo 'Test file created at $(date) from GitHub Actions via Pangolin Tunnel' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+               echo 'Test file created at $(date) from GitHub Actions via Pangolin' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
                ls -la ${{ env.TEST_DIR }}/"
