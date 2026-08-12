@@ -1,4 +1,4 @@
-name: Test Pangolin Deployment
+name: Test Deployment via Public SSH
 
 on:
   push:
@@ -6,10 +6,9 @@ on:
       - dev/pangolin
 
 env:
-  VPS_HOST: ${{ secrets.VPS_HOST }}
-  VPS_USER: ${{ secrets.VPS_USER }}
-  SSH_ALIAS: ${{ secrets.SSH_ALIAS }}
-  SSH_USER: ${{ secrets.SSH_USER }}
+  SSH_HOST: ${{ secrets.SSH_PUBLIC_HOST }}  # например, ssh.sun1tar.tech
+  SSH_USER: ${{ secrets.SSH_USER }}          # sun1tar
+  SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}    # приватный ключ для домашнего сервера
   TEST_DIR: "/home/sun1tar/pangolin-test"
 
 jobs:
@@ -21,35 +20,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up SSH key for VPS
+      - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Copy SSH key to VPS for home server
-        run: |
-          ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "mkdir -p ~/.ssh && cat > ~/.ssh/id_rsa << 'EOF'
-          ${{ secrets.SSH_PRIVATE_KEY }}
-          EOF"
-          ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "chmod 600 ~/.ssh/id_rsa"
+          echo "${{ env.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Generate random filename
         id: random
         run: |
           RANDOM_NAME="test-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4).txt"
           echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
-          echo "📝 Generated filename: $RANDOM_NAME"
 
-      - name: Create test file on home server
+      - name: Deploy to home server
         run: |
-          ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'EOF'
-            pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} -i ~/.ssh/id_rsa << 'ENDSSH'
-              mkdir -p ${{ env.TEST_DIR }}
-              cat > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} << 'FILE'
-              Test file created at $(date) from GitHub Actions via VPS relay
-              FILE
-              ls -la ${{ env.TEST_DIR }}/
-              ENDSSH
+          ssh ${{ env.SSH_USER }}@${{ env.SSH_HOST }} << 'EOF'
+            mkdir -p ${{ env.TEST_DIR }}
+            echo "Test file created at $(date) from GitHub Actions via public SSH" > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }}
+            ls -la ${{ env.TEST_DIR }}/
             EOF
