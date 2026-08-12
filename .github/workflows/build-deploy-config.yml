@@ -47,33 +47,34 @@ jobs:
           PANGOLIN_MACHINE_SECRET: ${{ secrets.PANGOLIN_MACHINE_SECRET }}
           PANGOLIN_ENDPOINT: ${{ env.PANGOLIN_ENDPOINT }}
         run: |
-          # 1. Поднимаем туннель Pangolin в фоне
-          sudo pangolin up \
+          # 1. Поднимаем туннель через nohup (чтобы процесс не убивался)
+          sudo nohup pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
             --endpoint "$PANGOLIN_ENDPOINT" \
-            --attach &
+            --attach > /tmp/pangolin.log 2>&1 &
 
           # 2. Ждем установки туннеля
           sleep 10
 
-          # 3. ДОБАВЛЯЕМ DNS-СЕРВЕР PANGOLIN В СИСТЕМУ
+          # 3. Проверяем статус
+          sudo pangolin status || true
+
+          # 4. Настраиваем DNS
           echo "nameserver 100.96.128.1" | sudo tee /etc/resolv.conf
 
-          # 4. Пингуем DNS-сервер Pangolin, чтобы туннель не ушел в DISCONNECTED
-          ping -i 1 100.96.128.1 > /dev/null &
+          # 5. Запускаем постоянный пинг, чтобы туннель не ушел в DISCONNECTED
+          sudo ping -i 0.5 100.96.128.1 > /dev/null 2>&1 &
 
           sleep 3
-
-          # 5. Проверяем статус
-          sudo pangolin status || true
 
           # 6. Проверяем, что host.internal резолвится
           nslookup host.internal || true
 
-          # 7. Подключаемся по SSH к host.internal и создаем файл
+          # 7. Подключаемся и создаем файл
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=10 \
               ${{ env.SSH_USER }}@host.internal \
               "mkdir -p ${{ env.TEST_DIR }} && \
                echo 'Test file created at $(date) from GitHub Actions via Pangolin Tunnel' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
