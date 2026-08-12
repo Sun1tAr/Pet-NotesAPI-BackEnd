@@ -42,23 +42,17 @@ jobs:
           echo "📝 Generated filename: $RANDOM_NAME"
 
       # ОТДЕЛЬНЫЙ ШАГ ДЛЯ ПОДНЯТИЯ ТУННЕЛЯ
-      - name: Start Pangolin tunnel (background service)
-        env:
-          PANGOLIN_MACHINE_ID: ${{ secrets.PANGOLIN_MACHINE_ID }}
-          PANGOLIN_MACHINE_SECRET: ${{ secrets.PANGOLIN_MACHINE_SECRET }}
-          PANGOLIN_ENDPOINT: ${{ env.PANGOLIN_ENDPOINT }}
+      - name: Start Pangolin tunnel (with timeout)
         run: |
-          sudo nohup pangolin up \
+          # Запускаем с таймаутом 30 секунд
+          timeout 30 sudo pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
             --endpoint "$PANGOLIN_ENDPOINT" \
-            --attach > /tmp/pangolin.log 2>&1 &
-          
-          # Ждем установки туннеля
-          sleep 10
-          
-          # Проверяем статус
-          sudo pangolin status
+            --attach || true
+
+          sleep 5
+          sudo pangolin statu
           
           # Запускаем пинг для поддержания туннеля
           sudo ping -i 0.5 100.96.128.1 > /dev/null 2>&1 &
