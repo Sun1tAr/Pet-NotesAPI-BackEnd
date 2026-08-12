@@ -13,7 +13,7 @@ env:
   SSH_ALIAS: ${{ secrets.SSH_ALIAS }}
   SSH_USER: ${{ secrets.SSH_USER }}
   TEST_DIR: "/home/sun1tar/pangolin-test"
-  ORG_NAME: "tested"  # <-- Ваша организация
+  ORG_NAME: "tested"
 
 jobs:
   deploy:
@@ -26,18 +26,27 @@ jobs:
 
       - name: Install Pangolin CLI
         run: |
-          curl -fsSL https://static.pangolin.net/get-cli.sh | sudo bash
+          curl -fsSL https://static.pangolin.net/get-cli.sh | bash
+          sudo mv pangolin /usr/local/bin/ || true
 
-      - name: Connect to Pangolin as Machine Client
+      - name: Login to Pangolin (machine client)
         run: |
-          sudo pangolin up \
+          echo "Logging in as machine client..."
+          echo "${{ env.PANGOLIN_MACHINE_SECRET }}" | pangolin login \
             --id ${{ env.PANGOLIN_MACHINE_ID }} \
-            --secret ${{ env.PANGOLIN_MACHINE_SECRET }} \
             --endpoint ${{ env.PANGOLIN_ENDPOINT }} \
-            --org ${{ env.ORG_NAME }} &
-          sleep 5
+            --headless
+          
+          pangolin select org ${{ env.ORG_NAME }}
           pangolin status
-          pangolin select org
+
+      - name: Start Pangolin tunnel
+        run: |
+          # Запускаем в фоне, но с правильным перенаправлением
+          nohup pangolin up --attach > /tmp/pangolin.log 2>&1 &
+          sleep 10
+          cat /tmp/pangolin.log
+          pangolin status
 
       - name: Generate random filename
         id: random
@@ -48,6 +57,8 @@ jobs:
 
       - name: Execute commands on home server
         run: |
+          # Ждем, пока установится соединение
+          sleep 5
           pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
             "mkdir -p ${{ env.TEST_DIR }} && \
              echo 'Test file created at $(date) from GitHub Actions via Pangolin Machine Client' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
