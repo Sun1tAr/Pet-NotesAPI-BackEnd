@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev/pangolin
-      - main
 
 env:
   PANGOLIN_ENDPOINT: "https://root.sun1tar.tech"
