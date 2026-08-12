@@ -40,13 +40,19 @@ jobs:
         run: |
           RANDOM_NAME="test-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4).txt"
           echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
+          echo "📝 Generated filename: $RANDOM_NAME"
 
-      - name: Deploy test file to home server
+      - name: Create test directory on home server
         run: |
-          ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} << 'EOF'
-            pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} -i ~/.ssh/id_rsa << 'ENDSSH'
-              mkdir -p ${{ env.TEST_DIR }}
-              echo "Test file created at $(date) from GitHub Actions via VPS relay" > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }}
-              ls -la ${{ env.TEST_DIR }}
-              ENDSSH"
-            EOF"
+          ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+            "pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} -i ~/.ssh/id_rsa 'mkdir -p ${{ env.TEST_DIR }}'"
+
+      - name: Create test file on home server
+        run: |
+          ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+            "pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} -i ~/.ssh/id_rsa 'echo \"Test file created at $(date) from GitHub Actions via VPS relay\" > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }}'"
+
+      - name: List files on home server
+        run: |
+          ssh ${{ env.VPS_USER }}@${{ env.VPS_HOST }} \
+            "pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} -i ~/.ssh/id_rsa 'ls -la ${{ env.TEST_DIR }}/'"
