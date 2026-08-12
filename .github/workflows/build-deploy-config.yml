@@ -15,59 +15,49 @@ env:
 
 jobs:
   deploy:
-    name: Deploy to Home Server
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install Pangolin CLI
         run: |
           curl -fsSL https://static.pangolin.net/get-cli.sh | bash
           sudo mv pangolin /usr/local/bin/ || true
 
-      - name: Setup SSH key for home server
+      - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
           echo "${{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H host.internal >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Generate random filename
         id: random
         run: |
           RANDOM_NAME="test-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4).txt"
           echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
-          echo "📝 Generated filename: $RANDOM_NAME"
 
-      # ОТДЕЛЬНЫЙ ШАГ ДЛЯ ПОДНЯТИЯ ТУННЕЛЯ
-      - name: Start Pangolin tunnel (with timeout)
+      - name: Deploy
         run: |
-          # Запускаем с таймаутом 30 секунд
+          # Запускаем туннель в фоне без --attach
           sudo pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
-            --endpoint "$PANGOLIN_ENDPOINT" \
-            --attach || true
+            --endpoint "$PANGOLIN_ENDPOINT" &
 
-          sleep 5
-          sudo pangolin status
-          
-          # Запускаем пинг для поддержания туннеля
-          sudo ping -i 0.5 100.96.128.1 > /dev/null 2>&1 &
+          sleep 10
 
-          # Настраиваем DNS через systemd-resolved
+          # Настраиваем DNS через resolvectl
           sudo resolvectl dns pangolin 100.96.128.1
           sudo resolvectl domain pangolin '~internal'
-          
-          # Проверяем, что хост резолвится
-          getent ahosts host.internal || echo "Resolve check failed"
-          
+
+          # Проверяем
+          sudo pangolin status
+
           # Подключаемся
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
-              -o ConnectTimeout=10 \
               ${{ env.SSH_USER }}@host.internal \
               "mkdir -p ${{ env.TEST_DIR }} && \
-               echo 'Test file created at $(date) from GitHub Actions via Pangolin' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+               echo 'Test' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
                ls -la ${{ env.TEST_DIR }}/"
