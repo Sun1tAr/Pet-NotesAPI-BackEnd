@@ -56,7 +56,7 @@ jobs:
         run: |
           # Ждем, пока установится соединение
           sleep 5
-          pangolin ssh \
+          sudo pangolin ssh \
             --org "$ORG_NAME" \
             ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
             "mkdir -p ${{ env.TEST_DIR }} && \
