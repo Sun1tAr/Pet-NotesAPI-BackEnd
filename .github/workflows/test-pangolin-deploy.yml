@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev/pangolin
+      - main
 
 env:
   PANGOLIN_ENDPOINT: "https://root.sun1tar.tech"
@@ -15,50 +16,71 @@ env:
 
 jobs:
   deploy:
+    name: Deploy to Home Server
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Install Pangolin CLI
         run: |
           curl -fsSL https://static.pangolin.net/get-cli.sh | bash
           sudo mv pangolin /usr/local/bin/ || true
-          pangolin --version
 
-      - name: Setup SSH key
+      - name: Setup SSH key for home server
         run: |
           mkdir -p ~/.ssh
           echo "${{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H host.internal >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Generate random filename
         id: random
         run: |
           RANDOM_NAME="test-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4).txt"
           echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
+          echo "📝 Generated filename: $RANDOM_NAME"
 
-      - name: Deploy
+      # ОТДЕЛЬНЫЙ ШАГ ДЛЯ ПОДНЯТИЯ ТУННЕЛЯ
+      - name: Start Pangolin tunnel (background service)
+        env:
+          PANGOLIN_MACHINE_ID: ${{ secrets.PANGOLIN_MACHINE_ID }}
+          PANGOLIN_MACHINE_SECRET: ${{ secrets.PANGOLIN_MACHINE_SECRET }}
+          PANGOLIN_ENDPOINT: ${{ env.PANGOLIN_ENDPOINT }}
         run: |
-          # Запускаем туннель в фоне без --attach
-          sudo pangolin up \
+          # Запускаем pangolin up без --attach (он сам уйдет в фон)
+          sudo nohup pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
-            --endpoint "$PANGOLIN_ENDPOINT" &
+            --endpoint "$PANGOLIN_ENDPOINT" \
+            > /tmp/pangolin.log 2>&1 &
+          
+          # Ждем установки туннеля
+          for i in {1..30}; do
+            if sudo pangolin status | grep -q "Connected"; then
+              echo "✅ Tunnel is connected!"
+              break
+            fi
+            sleep 2
+          done
+          
+          # Запускаем пинг для поддержания туннеля
+          sudo ping -i 1 100.96.128.1 > /dev/null 2>&1 &
 
-          sleep 10
-
-          # Настраиваем DNS через resolvectl
-          sudo resolvectl dns pangolin 100.96.128.1
-          sudo resolvectl domain pangolin '~internal'
-
-          # Проверяем
-          sudo pangolin status
-
-          # Подключаемся
+      # ОТДЕЛЬНЫЙ ШАГ ДЛЯ SSH
+      - name: Execute commands on home server
+        run: |
+          # Настраиваем DNS
+          echo "nameserver 100.96.128.1" | sudo tee /etc/resolv.conf
+          
+          # Проверяем, что host.internal резолвится
+          nslookup host.internal || true
+          
+          # Подключаемся и создаем файл
           ssh -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
+              -o ConnectTimeout=10 \
               ${{ env.SSH_USER }}@host.internal \
               "mkdir -p ${{ env.TEST_DIR }} && \
-               echo 'Test' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+               echo 'Test file created at $(date) from GitHub Actions via Pangolin Tunnel' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
                ls -la ${{ env.TEST_DIR }}/"
