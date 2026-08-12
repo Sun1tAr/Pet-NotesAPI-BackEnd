@@ -36,7 +36,7 @@ jobs:
             echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
             chmod 600 ~/.ssh/id_rsa
             echo "✅ SSH key for home server installed on VPS"
-          ENDSSH  
+ENDSSH
 
       - name: Generate random filename
         id: random
