@@ -37,6 +37,7 @@ jobs:
             --org ${{ env.ORG_NAME }} &
           sleep 5
           pangolin status
+          pangolin select org
 
       - name: Generate random filename
         id: random
