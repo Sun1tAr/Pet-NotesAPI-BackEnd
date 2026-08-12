@@ -29,22 +29,6 @@ jobs:
           curl -fsSL https://static.pangolin.net/get-cli.sh | bash
           sudo mv pangolin /usr/local/bin/ || true
 
-      - name: Connect to Pangolin as Machine Client
-        run: |
-          # Запускаем туннель строго с поддерживаемыми флагами документации.
-          # Флаг --attach не дает процессу закрыться и отключает интерактивность.
-          sudo pangolin up \
-            --id "$PANGOLIN_MACHINE_ID" \
-            --secret "$PANGOLIN_MACHINE_SECRET" \
-            --endpoint "$PANGOLIN_ENDPOINT" \
-            --attach &
-
-          # Даем 7 секунд на установку WireGuard соединения в фоне
-          sleep 7
-
-          # Проверяем, что клиент успешно подключился
-          pangolin status
-
       - name: Generate random filename
         id: random
         run: |
@@ -52,13 +36,25 @@ jobs:
           echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
           echo "📝 Generated filename: $RANDOM_NAME"
 
-      - name: Execute commands on home server
+      - name: Connect and Execute commands on home server
         run: |
-          # Ждем, пока установится соединение
-          sleep 5
+          # 1. Запускаем туннель в фоне внутри ЭТОГО ЖЕ шага
+          sudo pangolin up \
+            --id "$PANGOLIN_MACHINE_ID" \
+            --secret "$PANGOLIN_MACHINE_SECRET" \
+            --endpoint "$PANGOLIN_ENDPOINT" \
+            --attach &
+
+          # 2. Даем 10 секунд на полную установку WireGuard соединения
+          sleep 10
+
+          # Проверяем статус туннеля для отладки
+          sudo pangolin status || true
+
+          # 3. Выполняем SSH команду, пока туннель гарантированно жив
           sudo pangolin ssh \
             --org "$ORG_NAME" \
             ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
             "mkdir -p ${{ env.TEST_DIR }} && \
-             echo 'Test file created at $(date) from GitHub Actions via Pangolin Machine Client' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+             echo 'Test file created at \$(date) from GitHub Actions' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
              ls -la ${{ env.TEST_DIR }}/"
