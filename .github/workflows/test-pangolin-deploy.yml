@@ -27,16 +27,12 @@ jobs:
         run: |
           curl -fsSL https://static.pangolin.net/get-cli.sh | sudo bash
 
-      - name: Login as Machine Client
+      - name: Connect to Pangolin as Machine Client
         run: |
-          pangolin auth login \
+          sudo pangolin up \
             --id ${{ env.PANGOLIN_MACHINE_ID }} \
             --secret ${{ env.PANGOLIN_MACHINE_SECRET }} \
-            --endpoint ${{ env.PANGOLIN_ENDPOINT }}
-
-      - name: Connect to Pangolin network
-        run: |
-          pangolin up --attach &
+            --endpoint ${{ env.PANGOLIN_ENDPOINT }} &
           sleep 5
           pangolin status
 
