@@ -25,9 +25,7 @@ jobs:
 
       - name: Install Pangolin CLI
         run: |
-          curl -fsSL https://static.pangolin.net/get-cli.sh | bash
-          sudo mv pangolin /usr/local/bin/ || true
-          pangolin --version
+          curl -fsSL https://static.pangolin.net/get-cli.sh | sudo bash
 
       - name: Login as Machine Client
         run: |
