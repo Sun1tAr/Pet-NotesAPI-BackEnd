@@ -30,28 +30,30 @@ jobs:
           sudo mv pangolin /usr/local/bin/ || true
 
       - name: Connect to Pangolin as Machine Client
-        id: random
         run: |
-          # 1. Запуск туннеля напрямую без ухода в фон. Флаг --attach не даст процессу закрыться.
-          # Флаг --org уже передает организацию, поэтому select org не нужен.
+          # Запускаем туннель строго с поддерживаемыми флагами документации.
+          # Флаг --attach не дает процессу закрыться и отключает интерактивность.
           sudo pangolin up \
             --id "$PANGOLIN_MACHINE_ID" \
             --secret "$PANGOLIN_MACHINE_SECRET" \
             --endpoint "$PANGOLIN_ENDPOINT" \
-            --org "$ORG_NAME" \
-            --non-interactive \
             --attach &
 
-          # 2. Ждем, пока туннель поднимется
+          # Даем 7 секунд на установку WireGuard соединения в фоне
           sleep 7
 
-          # 3. Проверяем статус (не падает ли, если сессия еще не активна полностью)
-          pangolin status || true
-          
+          # Проверяем, что клиент успешно подключился
+          pangolin status
+
+      - name: Generate random filename
+        id: random
+        run: |
           RANDOM_NAME="test-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4).txt"
           echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
           echo "📝 Generated filename: $RANDOM_NAME"
-          
+
+      - name: Execute commands on home server
+        run: |
           # Ждем, пока установится соединение
           sleep 5
           pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
