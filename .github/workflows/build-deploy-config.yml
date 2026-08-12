@@ -1,63 +1,155 @@
-name: Deploy to Home Server via Pangolin
+name: Build, Push & Deploy to VPS
 
 on:
   push:
-    branches:
-      - dev/pangolin
+      branches: [master]
 
 env:
-  PANGOLIN_ENDPOINT: "https://root.sun1tar.tech"
-  PANGOLIN_MACHINE_ID: ${{ secrets.PANGOLIN_MACHINE_ID }}
-  PANGOLIN_MACHINE_SECRET: ${{ secrets.PANGOLIN_MACHINE_SECRET }}
-  SSH_USER: ${{ secrets.SSH_USER }}
-  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-  TEST_DIR: "/home/sun1tar/pangolin-test"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Install Pangolin CLI
-        run: |
-          curl -fsSL https://static.pangolin.net/get-cli.sh | bash
-          sudo mv pangolin /usr/local/bin/ || true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H host.internal >> ~/.ssh/known_hosts 2>/dev/null || true
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate random filename
-        id: random
-        run: |
-          RANDOM_NAME="test-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4).txt"
-          echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
+      - name: Convert image name to lowercase
+        id: image
+        run: echo "name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
-      - name: Deploy
-        run: |
-          # Запускаем туннель в фоне без --attach
-          sudo pangolin up \
-            --id "$PANGOLIN_MACHINE_ID" \
-            --secret "$PANGOLIN_MACHINE_SECRET" \
-            --endpoint "$PANGOLIN_ENDPOINT" &
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .docker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:latest
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-          sleep 10
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
 
-          # Настраиваем DNS через resolvectl
-          sudo resolvectl dns pangolin 100.96.128.1
-          sudo resolvectl domain pangolin '~internal'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-          # Проверяем
-          sudo pangolin status
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          source: ".docker/docker-compose.yml,.nginx/pet-notes-api.conf.template"
+          target: "/opt/pet-notes-api/"
 
-          # Подключаемся
-          ssh -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              ${{ env.SSH_USER }}@host.internal \
-              "mkdir -p ${{ env.TEST_DIR }} && \
-               echo 'Test' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
-               ls -la ${{ env.TEST_DIR }}/"
+      - name: Deploy Docker containers
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          IMAGE_NAME: sun1tar/pet-notesapi-backend
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          envs: POSTGRES_PASSWORD,GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME
+          script: |
+            set -e
+            echo "=== Starting Docker deployment ==="
+            cd /opt/pet-notes-api
+            echo "=== Logging in to GHCR ==="
+            echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+            echo "=== Pulling latest image ==="
+            docker pull ghcr.io/${IMAGE_NAME}:latest
+            echo "=== Cleaning up old containers ==="
+            docker-compose -f .docker/docker-compose.yml  down --remove-orphans || true
+            docker container rm -f notes-api-app pg_notes 2>/dev/null || true
+            docker network rm pet-notes-api_default 2>/dev/null || true
+            docker container prune -f
+            docker network prune -f
+            fuser -k 8888/tcp 2>/dev/null || true
+            sleep 2
+            echo "=== Starting new containers ==="
+            POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" docker-compose -f .docker/docker-compose.yml up -d
+            echo "=== Waiting for app to be healthy ==="
+            sleep 15
+            docker-compose -f .docker/docker-compose.yml  logs app
+            if docker-compose -f .docker/docker-compose.yml  ps | grep -q "Up"; then
+              echo "✅ Docker deployment successful!"
+            else
+              echo "❌ Docker deployment failed!"
+              docker-compose -f .docker/docker-compose.yml  logs
+              exit 1
+            fi
+            echo "=== Cleaning up Docker ==="
+            docker logout ghcr.io
+            docker image prune -f
+
+  configure-nginx:
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy Nginx config
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          source: ".nginx/pet-notes-api.conf.template"
+          target: "/opt/pet-notes-api/"
+
+      - name: Configure Nginx
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          SERVER_NAME: ${{ secrets.SERVER_NAME }}
+          REPO_NAME: ${{ secrets.REPO_NAME }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: 22
+          envs: SERVER_NAME,REPO_NAME
+          script: |
+            set -e
+            echo "=== Configuring Nginx ==="
+            cd /opt/pet-notes-api
+            
+            # Подстановка переменных
+            envsubst '${SERVER_NAME} ${REPO_NAME}' < .nginx/pet-notes-api.conf.template > /tmp/pet-notes-api.conf
+            
+            # Копируем СНАЧАЛА
+            sudo cp /tmp/pet-notes-api.conf /etc/nginx/apps-available/pet-notes-api.conf
+            sudo ln -sf /etc/nginx/apps-available/pet-notes-api.conf /etc/nginx/apps-enabled/
+            
+            sudo nginx -t && sudo systemctl reload nginx
+  
+            echo "✅ http://${SERVER_NAME}/${REPO_NAME}"
+
