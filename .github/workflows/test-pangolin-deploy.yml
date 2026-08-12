@@ -48,5 +48,5 @@ jobs:
               mkdir -p ${{ env.TEST_DIR }}
               echo "Test file created at $(date) from GitHub Actions via VPS relay" > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }}
               ls -la ${{ env.TEST_DIR }}
-  ENDSSH
-  EOF
+              ENDSSH"
+            EOF"
