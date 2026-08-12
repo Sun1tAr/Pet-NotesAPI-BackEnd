@@ -13,6 +13,7 @@ env:
   SSH_ALIAS: ${{ secrets.SSH_ALIAS }}
   SSH_USER: ${{ secrets.SSH_USER }}
   TEST_DIR: "/home/sun1tar/pangolin-test"
+  ORG_NAME: "tested"  # <-- Ваша организация
 
 jobs:
   deploy:
@@ -32,7 +33,8 @@ jobs:
           sudo pangolin up \
             --id ${{ env.PANGOLIN_MACHINE_ID }} \
             --secret ${{ env.PANGOLIN_MACHINE_SECRET }} \
-            --endpoint ${{ env.PANGOLIN_ENDPOINT }} &
+            --endpoint ${{ env.PANGOLIN_ENDPOINT }} \
+            --org ${{ env.ORG_NAME }} &
           sleep 5
           pangolin status
 
@@ -45,25 +47,7 @@ jobs:
 
       - name: Execute commands on home server
         run: |
-          pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} << 'ENDSSH'
-            echo "✅ Connected to home server!"
-            echo "📍 Current user: $(whoami)"
-            echo "📂 Current directory: $(pwd)"
-          
-            echo "📂 Creating test directory..."
-            mkdir -p ${{ env.TEST_DIR }}
-          
-            echo "📝 Creating test file: ${{ steps.random.outputs.filename }}"
-            echo "Test file created at $(date) from GitHub Actions via Pangolin Machine Client" > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }}
-          
-            echo "📋 Listing files:"
-            ls -la ${{ env.TEST_DIR }}/
-          
-            echo "✅ Deployment completed successfully!"
-            ENDSSH
-
-      - name: Verify deployment
-        run: |
-          echo "✅ Deployment completed successfully!"
-          echo "📁 Test file: ${{ steps.random.outputs.filename }}"
-          echo "📍 Location: /home/sun1tar/pangolin-test/ on home server"
+          pangolin ssh ${{ env.SSH_USER }}@${{ env.SSH_ALIAS }} \
+            "mkdir -p ${{ env.TEST_DIR }} && \
+             echo 'Test file created at $(date) from GitHub Actions via Pangolin Machine Client' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+             ls -la ${{ env.TEST_DIR }}/"
