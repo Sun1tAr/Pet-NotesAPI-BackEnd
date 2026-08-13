@@ -1,0 +1,70 @@
+name: Deploy to Home Server via NetBird
+
+on:
+  push:
+    branches:
+      - dev/netbird
+
+env:
+  NETBIRD_MANAGEMENT_URL: ${{ secrets.NETBIRD_MANAGEMENT_URL }}
+  NETBIRD_SETUP_KEY: ${{ secrets.NETBIRD_SETUP_KEY }}
+  NETBIRD_SSH_TARGET_SERVER: ${{ secrets.NETBIRD_SSH_TARGET_SERVER }}
+  SSH_USER: ${{ secrets.SSH_USER }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  TEST_DIR: "/home/${{ secrets.SSH_USER }}/netbird-test"
+
+jobs:
+  deploy:
+    name: Deploy to Home Server via NetBird
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install NetBird CLI
+        run: |
+          curl -fsSL https://pkgs.netbird.io/install.sh | bash
+          netbird version
+
+      - name: Setup SSH key for home server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Connect to NetBird network
+        run: |
+          sudo netbird up \
+            --setup-key "${{ secrets.NETBIRD_SETUP_KEY }}" \
+            --management-url "${{ secrets.NETBIRD_MANAGEMENT_URL }}"
+          sleep 5
+          netbird status
+
+      - name: Generate random filename
+        id: random
+        run: |
+          RANDOM_NAME="test-$(date +%Y%m%d-%H%M%S)-$(openssl rand -hex 4).txt"
+          echo "filename=$RANDOM_NAME" >> $GITHUB_OUTPUT
+          echo "📝 Generated filename: $RANDOM_NAME"
+
+      - name: Execute commands on home server
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -i ~/.ssh/id_rsa \
+              ${{ secrets.SSH_USER }}@${{ secrets.NETBIRD_SSH_TARGET_SERVER }} \
+              "mkdir -p ${{ env.TEST_DIR }} && \
+               echo 'Test file created at $(date) from GitHub Actions via NetBird' > ${{ env.TEST_DIR }}/${{ steps.random.outputs.filename }} && \
+               ls -la ${{ env.TEST_DIR }}/"
+
+      - name: Verify deployment
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "📁 Test file: ${{ steps.random.outputs.filename }}"
+          echo "📍 Location: ${{ env.TEST_DIR }}/ on home server"
+
+      - name: Disconnect from NetBird
+        if: always()
+        run: |
+          sudo netbird down
