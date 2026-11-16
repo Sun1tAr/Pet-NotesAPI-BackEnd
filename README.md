@@ -1,6 +1,3 @@
-Отличный проект! Вот подготовленный `README.md` для Pet-NotesAPI-BackEnd:
-
-
 # 📝 Pet Notes API BackEnd
 
 RESTful API сервис для управления заметками. Проект создан в качестве pet-проекта для демонстрации навыков разработки на Java Spring Boot.
@@ -183,12 +180,11 @@ spring.jpa.show-sql=false
 springdoc.swagger-ui.path=/swagger-ui.html
 ```
 
-## 🌐 Продакшен
+## 🌐 Демонстрационный контур
 
-Приложение развернуто и доступно по адресу:
-```
-http://denchik2376.fvds.ru/Pet-NotesAPI-BackEnd/swagger-ui/index.html
-```
+Адрес демонстрационного контура не фиксируется в README: окружение может быть
+остановлено или переехать. Для актуального запуска используйте Docker Compose и
+локальные переменные окружения.
 
 ## 🤝 Вклад в проект
 
